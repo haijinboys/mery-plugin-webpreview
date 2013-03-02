@@ -1,0 +1,12 @@
+#define IDS_MENU_TEXT 1
+#define IDS_STATUS_MESSAGE 2
+#define IDI_ICON 101
+
+IDI_ICON ICON "WebPreview_Icon.ico"
+
+STRINGTABLE
+LANGUAGE LANG_JAPANESE, 0x1
+{
+	IDS_MENU_TEXT, "Webプレビュー"
+	IDS_STATUS_MESSAGE, "Webプレビュー|Webプレビューを表示します。"
+}
