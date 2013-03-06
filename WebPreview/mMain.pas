@@ -14,13 +14,12 @@ uses
 {$IF CompilerVersion > 22.9}
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes, Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
-  Vcl.Menus, Vcl.StdCtrls, Vcl.ComCtrls, Vcl.ExtCtrls, Winapi.CommCtrl,
-  Vcl.OleCtrls,
+  Vcl.Menus, Vcl.StdCtrls, Vcl.ComCtrls, Vcl.ExtCtrls, Vcl.OleCtrls,
 {$ELSE}
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, Menus, StdCtrls, ComCtrls, ExtCtrls, CommCtrl, OleCtrls,
+  Dialogs, Menus, StdCtrls, ComCtrls, ExtCtrls, OleCtrls,
 {$IFEND}
-  SHDocVw, UWBDragDropContainer, UCustomDropTarget, Native;
+  SHDocVw, UWBDragDropContainer, UCustomDropTarget;
 
 type
   TMainForm = class(TForm, IDropHandler)
@@ -54,7 +53,7 @@ type
     FBackEnabled: Boolean;
     FForwardEnabled: Boolean;
     FFileName: string;
-    FPoint: TNativePoint;
+    FPoint: TPoint;
     procedure ReadIni;
     procedure WriteIni;
   protected
