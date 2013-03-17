@@ -20,7 +20,7 @@ uses
 
 resourcestring
   SName = 'WebƒvƒŒƒrƒ…[';
-  SVersion = '2.0.0';
+  SVersion = '2.0.2';
 
 type
   TWebPreviewFrame = class(TFrame)
@@ -69,9 +69,12 @@ begin
     Result := FForm.SetProperties
   else
   begin
-    with TMainForm.Create(nil) do
+    with TMainForm.CreateParented(Handle) do
       try
+        BarPos := FBarPos;
         Result := SetProperties;
+        if Result then
+          FBarPos := BarPos;
       finally
         Free;
       end;
