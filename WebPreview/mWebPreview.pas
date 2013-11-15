@@ -20,7 +20,7 @@ uses
 
 resourcestring
   SName = 'WebƒvƒŒƒrƒ…[';
-  SVersion = '2.0.2';
+  SVersion = '2.0.3';
 
 type
   TWebPreviewFrame = class(TFrame)
@@ -104,7 +104,7 @@ begin
           end;
         end;
       end;
-      if ((Msg.wParam >= VK_PRIOR) and (Msg.wParam <= VK_DELETE)) or (Msg.wParam <= VK_TAB) or (Msg.wParam <= VK_BACK) or (Msg.wParam <= VK_ESCAPE) or (Msg.wParam <= VK_RETURN) then
+      if ((Msg.wParam >= VK_PRIOR) and (Msg.wParam <= VK_DELETE)) or (Msg.wParam = VK_TAB) or (Msg.wParam = VK_BACK) or (Msg.wParam = VK_ESCAPE) or (Msg.wParam = VK_RETURN) then
       begin
         SendMessage(GetFocus, Msg.message, Msg.wParam, Msg.lParam);
         Result := True;
