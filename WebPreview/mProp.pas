@@ -71,9 +71,9 @@ begin
     end;
   with Font do
   begin
-    ChangeScale(FFontSize, Size);
-    Name := FFontName;
-    Size := FFontSize;
+    ChangeScale(FFont.Size, Size);
+    Name := FFont.Name;
+    Size := FFont.Size;
   end;
 end;
 

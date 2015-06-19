@@ -19,10 +19,10 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, Menus, StdCtrls, ComCtrls, ExtCtrls, OleCtrls,
 {$IFEND}
-  SHDocVw, UWBDragDropContainer, UCustomDropTarget;
+  SHDocVw, UWBDragDropContainer, UCustomDropTarget, mPerMonitorDpi;
 
 type
-  TMainForm = class(TForm, IDropHandler)
+  TMainForm = class(TScaledForm, IDropHandler)
     PopupMenu: TPopupMenu;
     BackMenuItem: TMenuItem;
     ForwardMenuItem: TMenuItem;
@@ -63,6 +63,7 @@ type
   public
     { Public éŒ¾ }
     procedure WebPreviewAll;
+    procedure SetScale(const Value: NativeInt);
     function SetProperties: Boolean;
     property BarPos: NativeInt read FBarPos write FBarPos;
     property UpdateWebPreview: Boolean read FUpdateWebPreview write FUpdateWebPreview;
@@ -71,8 +72,7 @@ type
 
 var
   MainForm: TMainForm;
-  FFontName: string;
-  FFontSize: NativeInt;
+  FFont: TFont;
 
 implementation
 
@@ -97,6 +97,7 @@ begin
       Size := 8;
     end;
   FEditor := ParentWindow;
+  FFont.Assign(Font);
   FUpdateWebPreview := False;
   FFileName := '';
   FPoint.X := 0;
@@ -104,9 +105,9 @@ begin
   ReadIni;
   with Font do
   begin
-    ChangeScale(FFontSize, Size);
-    Name := FFontName;
-    Size := FFontSize;
+    ChangeScale(FFont.Size, Size);
+    Name := FFont.Name;
+    Size := FFont.Size;
   end;
   OleInitialize(nil);
   FWBContainer := TWBDragDropContainer.Create(WebBrowser);
@@ -186,8 +187,18 @@ begin
     Exit;
   with TMemIniFile.Create(S, TEncoding.UTF8) do
     try
-      FFontName := ReadString('MainForm', 'FontName', Font.Name);
-      FFontSize := ReadInteger('MainForm', 'FontSize', Font.Size);
+      with FFont do
+        if ValueExists('MainForm', 'FontName') then
+        begin
+          Name := ReadString('MainForm', 'FontName', Name);
+          Size := ReadInteger('MainForm', 'FontSize', Size);
+          Height := MulDiv(Height, 96, Screen.PixelsPerInch);
+        end
+        else if (Win32MajorVersion > 6) or ((Win32MajorVersion = 6) and (Win32MinorVersion >= 2)) then
+        begin
+          Assign(Screen.IconFont);
+          Height := MulDiv(Height, 96, Screen.PixelsPerInch);
+        end;
     finally
       Free;
     end;
@@ -246,9 +257,20 @@ begin
       FPoint.X := 0;
       FPoint.Y := 0;
     end;
-    WebBrowser.Navigate(S);
+    WebBrowser.Silent := True;
+    WebBrowser.Navigate(S, navNoReadFromCache or navNoWriteToCache);
     FFileName := S;
   end;
+end;
+
+procedure TMainForm.SetScale(const Value: NativeInt);
+var
+  P: NativeInt;
+begin
+  P := PixelsPerInch;
+  PixelsPerInch := Value;
+  with Font do
+    Height := MulDiv(Height, Self.PixelsPerInch, P);
 end;
 
 function TMainForm.SetProperties: Boolean;
@@ -261,5 +283,14 @@ begin
     Result := True;
   end;
 end;
+
+initialization
+
+FFont := TFont.Create;
+
+finalization
+
+if Assigned(FFont) then
+  FreeAndNil(FFont);
 
 end.
