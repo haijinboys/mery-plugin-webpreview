@@ -3,7 +3,7 @@
 //
 // Copyright (c) Kuro. All Rights Reserved.
 // e-mail: info@haijin-boys.com
-// www:    http://www.haijin-boys.com/
+// www:    https://www.haijin-boys.com/
 // -----------------------------------------------------------------------------
 
 unit mMain;
@@ -43,11 +43,13 @@ type
     procedure WebBrowserCommandStateChange(ASender: TObject; Command: Integer;
       Enable: WordBool);
     procedure WebBrowserNavigateComplete2(ASender: TObject;
-      const pDisp: IDispatch; var URL: OleVariant);
+      const pDisp: IDispatch; const URL: OleVariant);
   private
     { Private êÈåæ }
     FEditor: THandle;
-    FBarPos: NativeInt;
+    FBarPos: Integer;
+    FAutoDisplay: Boolean;
+    FModeList: TStringList;
     FUpdateWebPreview: Boolean;
     FWBContainer: TWBDragDropContainer;
     FBackEnabled: Boolean;
@@ -63,16 +65,17 @@ type
   public
     { Public êÈåæ }
     procedure WebPreviewAll;
-    procedure SetScale(const Value: NativeInt);
+    procedure SetScale(const Value: Integer);
     function SetProperties: Boolean;
-    property BarPos: NativeInt read FBarPos write FBarPos;
+    property BarPos: Integer read FBarPos write FBarPos;
+    property AutoDisplay: Boolean read FAutoDisplay write FAutoDisplay;
+    property ModeList: TStringList read FModeList write FModeList;
     property UpdateWebPreview: Boolean read FUpdateWebPreview write FUpdateWebPreview;
     property Editor: THandle read FEditor write FEditor;
   end;
 
 var
   MainForm: TMainForm;
-  FFont: TFont;
 
 implementation
 
@@ -90,25 +93,15 @@ uses
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-  if Win32MajorVersion < 6 then
-    with Font do
-    begin
-      Name := 'Tahoma';
-      Size := 8;
-    end;
+  TScaledForm.DefaultFont.Assign(Font);
   FEditor := ParentWindow;
-  FFont.Assign(Font);
+  FModeList := TStringList.Create;
+  FModeList.CaseSensitive := False;
   FUpdateWebPreview := False;
   FFileName := '';
   FPoint.X := 0;
   FPoint.Y := 0;
   ReadIni;
-  with Font do
-  begin
-    ChangeScale(FFont.Size, Size);
-    Name := FFont.Name;
-    Size := FFont.Size;
-  end;
   OleInitialize(nil);
   FWBContainer := TWBDragDropContainer.Create(WebBrowser);
   FWBContainer.DropTarget := TCustomDropTarget.Create(Self);
@@ -122,6 +115,8 @@ begin
   FWBContainer.DropTarget := nil;
   FreeAndNil(FWBContainer);
   OleUninitialize;
+  if Assigned(FModeList) then
+    FreeAndNil(FModeList);
 end;
 
 procedure TMainForm.FormShow(Sender: TObject);
@@ -174,7 +169,7 @@ begin
 end;
 
 procedure TMainForm.WebBrowserNavigateComplete2(ASender: TObject;
-  const pDisp: IDispatch; var URL: OleVariant);
+  const pDisp: IDispatch; const URL: OleVariant);
 begin
   OLEVariant(WebBrowser.Document as IHTMLDocument2).ParentWindow.Scroll(FPoint.X, FPoint.Y);
 end;
@@ -187,18 +182,14 @@ begin
     Exit;
   with TMemIniFile.Create(S, TEncoding.UTF8) do
     try
-      with FFont do
+      with TScaledForm.DefaultFont do
         if ValueExists('MainForm', 'FontName') then
         begin
           Name := ReadString('MainForm', 'FontName', Name);
           Size := ReadInteger('MainForm', 'FontSize', Size);
-          Height := MulDiv(Height, 96, Screen.PixelsPerInch);
         end
-        else if (Win32MajorVersion > 6) or ((Win32MajorVersion = 6) and (Win32MinorVersion >= 2)) then
-        begin
+        else if CheckWin32Version(6, 2) then
           Assign(Screen.IconFont);
-          Height := MulDiv(Height, 96, Screen.PixelsPerInch);
-        end;
     finally
       Free;
     end;
@@ -214,6 +205,8 @@ begin
     with TMemIniFile.Create(S, TEncoding.UTF8) do
       try
         WriteInteger('WebPreview', 'CustomBarPos', FBarPos);
+        WriteBool('WebPreview', 'AutoDisplay', FAutoDisplay);
+        WriteString('WebPreview', 'ModeList', FModeList.CommaText);
         UpdateFile;
       finally
         Free;
@@ -230,7 +223,7 @@ end;
 
 procedure TMainForm.HandleFiles(const Files: TStrings);
 var
-  I: NativeInt;
+  I: Integer;
   S: string;
 begin
   for I := 0 to Files.Count - 1 do
@@ -263,9 +256,9 @@ begin
   end;
 end;
 
-procedure TMainForm.SetScale(const Value: NativeInt);
+procedure TMainForm.SetScale(const Value: Integer);
 var
-  P: NativeInt;
+  P: Integer;
 begin
   P := PixelsPerInch;
   PixelsPerInch := Value;
@@ -274,23 +267,36 @@ begin
 end;
 
 function TMainForm.SetProperties: Boolean;
+var
+  S, P: PChar;
+  Len: Cardinal;
+  Modes: TStrings;
 begin
   Result := False;
-  if Prop(Self, FBarPos) then
-  begin
-    WriteIni;
-    FUpdateWebPreview := True;
-    Result := True;
+  Modes := TStringList.Create;
+  try
+    Len := Editor_EnumMode(FEditor, nil, 0);
+    S := StrAlloc(Len);
+    try
+      Editor_EnumMode(FEditor, S, Len);
+      P := S;
+      while P^ <> #0 do
+      begin
+        Modes.Add(P);
+        Inc(P, StrLen(P) + 1);
+      end;
+    finally
+      StrDispose(S);
+    end;
+    if Prop(Self, FBarPos, FAutoDisplay, FModeList, Modes) then
+    begin
+      WriteIni;
+      FUpdateWebPreview := True;
+      Result := True;
+    end;
+  finally
+    Modes.Free;
   end;
 end;
-
-initialization
-
-FFont := TFont.Create;
-
-finalization
-
-if Assigned(FFont) then
-  FreeAndNil(FFont);
 
 end.

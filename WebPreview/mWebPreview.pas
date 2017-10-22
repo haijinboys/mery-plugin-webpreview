@@ -3,7 +3,7 @@
 //
 // Copyright (c) Kuro. All Rights Reserved.
 // e-mail: info@haijin-boys.com
-// www:    http://www.haijin-boys.com/
+// www:    https://www.haijin-boys.com/
 // -----------------------------------------------------------------------------
 
 unit mWebPreview;
@@ -12,24 +12,26 @@ interface
 
 uses
 {$IF CompilerVersion > 22.9}
-  Winapi.Windows, Winapi.Messages, System.SysUtils,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes,
 {$ELSE}
-  Windows, Messages, SysUtils,
+  Windows, Messages, SysUtils, Classes,
 {$IFEND}
   mCommon, mMain, mFrame, mPlugin;
 
 resourcestring
   SName = 'WebÉvÉåÉrÉÖÅ[';
-  SVersion = '2.1.0';
+  SVersion = '2.3.1';
 
 type
   TWebPreviewFrame = class(TFrame)
   private
     { Private êÈåæ }
     FForm: TMainForm;
-    FClientID: LongWord;
-    FBarPos: NativeInt;
-    FOpenStartup: Boolean;
+    FClientID: Cardinal;
+    FBarPos: Integer;
+    FAutoDisplay: Boolean;
+    FModeList: TStringList;
+    FMode: string;
     function QueryProperties: Boolean;
     function SetProperties: Boolean;
     function PreTranslateMessage(hwnd: HWND; var Msg: tagMSG): Boolean;
@@ -40,11 +42,13 @@ type
     { Protected êÈåæ }
   public
     { Public êÈåæ }
+    constructor Create;
+    destructor Destroy; override;
     procedure OnIdle;
     procedure OnCommand(hwnd: HWND); override;
     function QueryStatus(hwnd: HWND; pbChecked: PBOOL): BOOL; override;
-    procedure OnEvents(hwnd: HWND; nEvent: NativeInt; lParam: LPARAM); override;
-    function PluginProc(hwnd: HWND; nMsg: NativeInt; wParam: WPARAM; lParam: LPARAM): LRESULT; override;
+    procedure OnEvents(hwnd: HWND; nEvent: Cardinal; lParam: LPARAM); override;
+    function PluginProc(hwnd: HWND; nMsg: Cardinal; wParam: WPARAM; lParam: LPARAM): LRESULT; override;
   end;
 
 implementation
@@ -57,6 +61,19 @@ uses
 {$IFEND}
 
 { TWebPreviewFrame }
+
+constructor TWebPreviewFrame.Create;
+begin
+  FModeList := TStringList.Create;
+  FModeList.CaseSensitive := False;
+end;
+
+destructor TWebPreviewFrame.Destroy;
+begin
+  if Assigned(FModeList) then
+    FreeAndNil(FModeList);
+  inherited;
+end;
 
 function TWebPreviewFrame.QueryProperties: Boolean;
 begin
@@ -72,9 +89,15 @@ begin
     with TMainForm.CreateParented(Handle) do
       try
         BarPos := FBarPos;
+        AutoDisplay := FAutoDisplay;
+        ModeList.Assign(FModeList);
         Result := SetProperties;
         if Result then
+        begin
           FBarPos := BarPos;
+          FAutoDisplay := AutoDisplay;
+          FModeList.Assign(ModeList);
+        end;
       finally
         Free;
       end;
@@ -129,6 +152,8 @@ begin
       Top := 0;
       Visible := True;
       BarPos := FBarPos;
+      AutoDisplay := FAutoDisplay;
+      ModeList.Assign(FModeList);
     end;
     with Info do
     begin
@@ -179,6 +204,8 @@ begin
           OpenCustomBar;
           Exit;
         end;
+        FAutoDisplay := AutoDisplay;
+        FModeList.Assign(ModeList);
       end;
       UpdateWebPreview := False;
     end;
@@ -199,10 +226,11 @@ begin
   Result := True;
 end;
 
-procedure TWebPreviewFrame.OnEvents(hwnd: HWND; nEvent: NativeInt; lParam: LPARAM);
+procedure TWebPreviewFrame.OnEvents(hwnd: HWND; nEvent: Cardinal; lParam: LPARAM);
 var
   S: string;
   Info: TCustomBarCloseInfo;
+  Mode: array [0 .. MAX_MODE_NAME - 1] of Char;
 begin
   if (nEvent and EVENT_CREATE_FRAME) <> 0 then
   begin
@@ -210,17 +238,35 @@ begin
       Exit;
     with TMemIniFile.Create(S, TEncoding.UTF8) do
       try
-        FOpenStartup := ReadBool('WebPreview', 'OpenStartup', False);
         FBarPos := ReadInteger('WebPreview', 'CustomBarPos', CUSTOM_BAR_BOTTOM);
+        FAutoDisplay := ReadBool('WebPreview', 'AutoDisplay', False);
+        FModeList.CommaText := ReadString('WebPreview', 'ModeList', 'HTML');
       finally
         Free;
       end;
-    if FOpenStartup then
+    Mode[0] := #0;
+    Editor_GetMode(hwnd, @Mode);
+    FMode := Mode;
+    if FAutoDisplay and (FModeList.IndexOf(Mode) > -1) then
       OnCommand(hwnd);
   end;
   if (nEvent and EVENT_CLOSE_FRAME) <> 0 then
-  begin
     CloseCustomBar;
+  if (nEvent and (EVENT_FILE_OPENED or EVENT_MODE_CHANGED or EVENT_DOC_SEL_CHANGED)) <> 0 then
+  begin
+    if FAutoDisplay then
+    begin
+      Mode[0] := #0;
+      Editor_GetMode(hwnd, @Mode);
+      if not SameText(Mode, FMode) then
+      begin
+        if FModeList.IndexOf(Mode) > -1 then
+          OpenCustomBar
+        else
+          CloseCustomBar;
+        FMode := Mode;
+      end;
+    end;
   end;
   if (nEvent and (EVENT_MODE_CHANGED or EVENT_DOC_SEL_CHANGED)) <> 0 then
   begin
@@ -241,23 +287,7 @@ begin
   begin
     Info := PCustomBarCloseInfo(lParam)^;
     if Info.nID = FClientID then
-    begin
       CustomBarClosed;
-      FOpenStartup := (Info.dwFlags and CLOSED_FRAME_WINDOW) <> 0;
-      if FIniFailed or (not GetIniFileName(S)) then
-        Exit;
-      try
-        with TMemIniFile.Create(S, TEncoding.UTF8) do
-          try
-            WriteBool('WebPreview', 'OpenStartup', FOpenStartup);
-            UpdateFile;
-          finally
-            Free;
-          end;
-      except
-        FIniFailed := True;
-      end;
-    end;
   end;
   if (nEvent and EVENT_FILE_SAVED) <> 0 then
   begin
@@ -273,7 +303,7 @@ begin
   end;
 end;
 
-function TWebPreviewFrame.PluginProc(hwnd: HWND; nMsg: NativeInt; wParam: WPARAM; lParam: LPARAM): LRESULT;
+function TWebPreviewFrame.PluginProc(hwnd: HWND; nMsg: Cardinal; wParam: WPARAM; lParam: LPARAM): LRESULT;
 begin
   Result := 0;
   case nMsg of
