@@ -20,7 +20,7 @@ uses
 
 resourcestring
   SName = 'WebƒvƒŒƒrƒ…[';
-  SVersion = '2.3.1';
+  SVersion = '2.3.3';
 
 type
   TWebPreviewFrame = class(TFrame)
